@@ -14,7 +14,7 @@
 !
 module mo_fluxes_byband_kernels
   use, intrinsic :: iso_c_binding
-  use mo_rte_kind, only: wp
+  use mo_rte_kind, only: wp, vsize
   implicit none
   private
   public :: sum_byband, net_byband
@@ -34,8 +34,10 @@ contains
     real(wp), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux
     real(wp), dimension(ncol, nlev, nbnd), intent(out) :: byband_flux
 
-    integer :: icol, ilev, igpt, ibnd
-    !$acc parallel loop collapse(3) copyin(spectral_flux, band_lims) copyout(byband_flux)
+    integer :: icol, ilev, igpt, ibnd, ngangs
+
+    ngangs = nbnd*nlev*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) copyin(spectral_flux, band_lims) copyout(byband_flux)
     do ibnd = 1, nbnd
       do ilev = 1, nlev
         do icol = 1, ncol
@@ -58,9 +60,10 @@ contains
     real(wp), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux_dn, spectral_flux_up
     real(wp), dimension(ncol, nlev, nbnd), intent(out) :: byband_flux_net
 
-    integer :: icol, ilev, igpt, ibnd
+    integer :: icol, ilev, igpt, ibnd, ngangs
 
-    !$acc parallel loop collapse(3) copyin(spectral_flux_dn, spectral_flux_up, band_lims) copyout(byband_flux_net)
+    ngangs = nbnd*nlev*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) copyin(spectral_flux_dn, spectral_flux_up, band_lims) copyout(byband_flux_net)
     do ibnd = 1, nbnd
       do ilev = 1, nlev
         do icol = 1, ncol

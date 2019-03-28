@@ -32,4 +32,9 @@ module mo_rte_kind
   !
   integer, parameter :: wl = c_bool
 
+  ! Workaround for PGI OpenACC performance bug
+  ! Number of threads within a single OpenACC "gang"
+  ! Typically mapped as the number of threads within a CUDA "block"
+  integer, parameter :: vsize = 128
+
 end module mo_rte_kind

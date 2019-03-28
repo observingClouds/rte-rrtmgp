@@ -27,7 +27,7 @@
 ! -------------------------------------------------------------------------------------------------
 module mo_rte_solver_kernels
   use,  intrinsic :: iso_c_binding
-  use mo_rte_kind, only: wp, wl
+  use mo_rte_kind, only: wp, wl, vsize
   implicit none
   private
 
@@ -46,6 +46,9 @@ module mo_rte_solver_kernels
             adding
 
   real(wp), parameter :: pi = acos(-1._wp)
+
+  integer :: ngangs
+
 contains
   ! -------------------------------------------------------------------------------------------------
   !
@@ -114,7 +117,8 @@ contains
     ! implementations on Ascent with PGI, we assume due to floating point
     ! differences in the exp() function. These differences are small in the
     ! RFMIP test case (10^-6).
-    !$acc parallel loop collapse(3) async
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) async
     do igpt = 1, ngpt
       do ilev = 1, nlay
         do icol = 1, ncol
@@ -127,7 +131,8 @@ contains
       end do
     end do
 
-    !$acc parallel loop collapse(2) async
+    ngangs = ngpt*ncol/vsize+1
+    !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
     do igpt = 1, ngpt
       do icol = 1, ncol
         !
@@ -160,7 +165,8 @@ contains
     !
     ! Convert intensity to flux assuming azimuthal isotropy and quadrature weight
     !
-    !$acc parallel loop collapse(3) async
+    ngangs = ngpt*(nlay+1)*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) async
     do igpt = 1, ngpt
       do ilev = 1, nlay+1
         do icol = 1, ncol
@@ -213,7 +219,8 @@ contains
 
     ! ------------------------------------
     ! ------------------------------------
-    !$acc  parallel loop collapse(2) async
+    ngangs = ngpt*ncol/vsize+1
+    !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
     do igpt = 1, ngpt
       do icol = 1, ncol
         Ds_ncol(icol, igpt) = Ds(1)
@@ -231,7 +238,8 @@ contains
     call apply_BC(ncol, nlay, ngpt, top_at_1, flux_dn(:,top_level,:), radn_dn)
 
     do imu = 2, nmus
-      !$acc  parallel loop collapse(2) async
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do icol = 1, ncol
           Ds_ncol(icol, igpt) = Ds(imu)
@@ -241,7 +249,8 @@ contains
                             top_at_1, Ds_ncol, weights(imu), tau, &
                             lay_source, lev_source_inc, lev_source_dec, sfc_emis, sfc_src, &
                             radn_up, radn_dn)
-      !$acc  parallel loop collapse(3) async
+      ngangs = ngpt*(nlay+1)*ncol/vsize+1
+      !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do ilev = 1, nlay+1
           do icol = 1, ncol
@@ -324,7 +333,8 @@ contains
                         gamma1, gamma2, Rdif, Tdif, tau, &
                         source_dn, source_up, source_sfc)
 
-    !$acc  parallel loop collapse(2)
+    ngangs = ngpt*ncol/vsize+1
+    !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
     do igpt = 1, ngpt
       do icol = 1, ncol
         sfc_albedo(icol,igpt) = 1._wp - sfc_emis(icol,igpt)
@@ -364,7 +374,9 @@ contains
       ! ------------------------------------
       ! ------------------------------------
       !$acc enter data copyin(tau, mu0) create(mu0_inv, flux_dir)
-      !$acc parallel loop
+
+      ngangs = ncol/vsize+1
+      !$acc parallel loop num_gangs(ngangs) vector_length(vsize)
       do icol = 1, ncol
         mu0_inv(icol) = 1._wp/mu0(icol)
       enddo
@@ -378,7 +390,8 @@ contains
         !   radiation just passed through?
         ! layer index = level index - 1
         ! previous level is up (-1)
-        !$acc parallel loop collapse(2)
+        ngangs = ngpt*ncol/vsize+1
+        !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
         do igpt = 1, ngpt
           do icol = 1, ncol
             do ilev = 2, nlay+1
@@ -389,7 +402,8 @@ contains
       else
         ! layer index = level index
         ! previous level is up (+1)
-        !$acc parallel loop collapse(2)
+        ngangs = ngpt*ncol/vsize+1
+        !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
         do igpt = 1, ngpt
           do icol = 1, ncol
             do ilev = nlay, 1, -1
@@ -450,7 +464,8 @@ contains
       !
       ! adding computes only diffuse flux; flux_dn is total
       !
-      !$acc  parallel loop collapse(3)
+      ngangs = ngpt*(nlay+1)*ncol/vsize+1
+      !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
       do igpt = 1, ngpt
         do ilay = 1, nlay+1
           do icol = 1, ncol
@@ -490,7 +505,8 @@ contains
       real(wp), parameter :: tau_thresh = sqrt(epsilon(tau))
       ! ---------------------------------------------------------------
       ! ---------------------------------------------------------------
-      !$acc  parallel loop collapse(3) async
+      ngangs = ngpt*nlay*ncol/vsize+1
+      !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do ilay = 1, nlay
           do icol = 1, ncol
@@ -541,7 +557,8 @@ contains
       !
       ! Top of domain is index 1
       !
-      !$acc  parallel loop collapse(2) async
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do icol = 1, ncol
           ! Downward propagation
@@ -562,7 +579,8 @@ contains
       !
       ! Top of domain is index nlay+1
       !
-      !$acc  parallel loop collapse(2) async
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do icol = 1, ncol
           ! Downward propagation
@@ -612,7 +630,8 @@ contains
     !$acc enter data copyin(tau, w0, g)
     !$acc enter data create(gamma1, gamma2, Rdif, Tdif)
 
-    !$acc  parallel loop collapse(3)
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do igpt = 1, ngpt
       do ilay = 1, nlay
         do icol = 1, ncol
@@ -675,7 +694,8 @@ contains
     !$acc enter data copyin(lev_src_inc, lev_src_dec)
     !$acc enter data create(lev_source)
 
-    !$acc  parallel loop collapse(3)
+    ngangs = ngpt*(nlay+1)*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do igpt = 1, ngpt
       do ilay = 1, nlay+1
         do icol = 1,ncol
@@ -725,7 +745,8 @@ contains
     !$acc enter data copyin(sfc_emis, sfc_src, lay_source, tau, gamma1, gamma2, rdif, tdif, lev_source)
     !$acc enter data create(source_dn, source_up, source_sfc)
 
-    !$acc parallel loop collapse(3)
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do igpt = 1, ngpt
       do ilay = 1, nlay
         do icol = 1, ncol
@@ -795,7 +816,8 @@ contains
       !$acc enter data copyin (mu0, tau, w0, g)
       !$acc enter data create(Rdif, Tdif, Rdir, Tdir, Tnoscat, mu0_inv)
 
-      !$acc parallel loop
+      ngangs = ncol/vsize+1
+      !$acc parallel loop num_gangs(ngangs) vector_length(vsize)
       do icol = 1, ncol
         mu0_inv(icol) = 1._wp/mu0(icol)
       enddo
@@ -803,7 +825,8 @@ contains
       ! NOTE: this kernel appears to cause small (10^-6) differences between GPU
       ! and CPU. This *might* be floating point differences in implementation of
       ! the exp function.
-      !$acc  parallel loop collapse(3)
+      ngangs = ngpt*nlay*ncol/vsize+1
+      !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
       do igpt = 1, ngpt
         do ilay = 1, nlay
           do icol = 1, ncol
@@ -907,7 +930,8 @@ contains
     !$acc enter data create(source_dn, source_up, source_sfc)
 
     if(top_at_1) then
-      !$acc  parallel loop collapse(2)
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
       do igpt = 1, ngpt
         do icol = 1, ncol
           do ilev = 1, nlay
@@ -921,7 +945,8 @@ contains
     else
       ! layer index = level index
       ! previous level is up (+1)
-      !$acc  parallel loop collapse(2)
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
       do igpt = 1, ngpt
         do icol = 1, ncol
           do ilev = nlay, 1, -1
@@ -977,13 +1002,13 @@ contains
     !$acc enter data create(flux_up, albedo, src, denom)
     if(top_at_1) then
 #ifdef __PGI
-      !$acc parallel loop
+      !$acc parallel loop gang num_gangs(ngpt) vector_length(128)
 #else
       !$acc parallel loop collapse(2) private(albedo, src, denom)
 #endif
       do igpt = 1, ngpt
 #ifdef __PGI
-        !$acc loop private(albedo, src, denom)
+        !$acc loop vector private(albedo, src, denom)
 #endif
         do icol = 1, ncol
           ilev = nlay + 1
@@ -1029,13 +1054,13 @@ contains
       end do
     else
 #ifdef __PGI
-      !$acc parallel loop
+      !$acc parallel loop gang num_gangs(ngpt) vector_length(128)
 #else
       !$acc parallel loop collapse(2) private(albedo, src, denom)
 #endif
       do igpt = 1, ngpt
 #ifdef __PGI
-        !$acc loop private(albedo, src, denom)
+        !$acc loop vector private(albedo, src, denom)
 #endif
         do icol = 1, ncol
           ilev = 1
@@ -1100,14 +1125,16 @@ contains
     ! --------------
     !   Upper boundary condition
     if(top_at_1) then
-      !$acc  parallel loop collapse(2) async
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do icol = 1, ncol
           flux_dn(icol,      1, igpt)  = inc_flux(icol,igpt)
         end do
       end do
     else
-      !$acc  parallel loop collapse(2) async
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do icol = 1, ncol
           flux_dn(icol, nlay+1, igpt)  = inc_flux(icol,igpt)
@@ -1130,14 +1157,16 @@ contains
 
     !   Upper boundary condition
     if(top_at_1) then
-      !$acc  parallel loop collapse(2) async
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do icol = 1, ncol
           flux_dn(icol,      1, igpt)  = inc_flux(icol,igpt) * factor(icol)
         end do
       end do
     else
-      !$acc  parallel loop collapse(2) async
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do icol = 1, ncol
           flux_dn(icol, nlay+1, igpt)  = inc_flux(icol,igpt) * factor(icol)
@@ -1158,14 +1187,16 @@ contains
 
     !   Upper boundary condition
     if(top_at_1) then
-      !$acc  parallel loop collapse(2) async
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do icol = 1, ncol
           flux_dn(icol,      1, igpt)  = 0._wp
         end do
       end do
     else
-      !$acc  parallel loop collapse(2) async
+      ngangs = ngpt*ncol/vsize+1
+      !$acc  parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) async
       do igpt = 1, ngpt
         do icol = 1, ncol
           flux_dn(icol, nlay+1, igpt)  = 0._wp

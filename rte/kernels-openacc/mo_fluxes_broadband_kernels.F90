@@ -15,7 +15,7 @@
 ! -------------------------------------------------------------------------------------------------
 module mo_fluxes_broadband_kernels
   use, intrinsic :: iso_c_binding
-  use mo_rte_kind, only: wp
+  use mo_rte_kind, only: wp, vsize
   implicit none
   private
   public :: sum_broadband, net_broadband
@@ -33,17 +33,20 @@ contains
     real(wp), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux
     real(wp), dimension(ncol, nlev),       intent(out) :: broadband_flux
 
-    integer  :: icol, ilev, igpt
+    integer  :: icol, ilev, igpt, ngangs
     real(wp) :: total
     !$acc enter data copyin(spectral_flux) create(broadband_flux)
-    !$acc parallel loop collapse(2)
+
+    ngangs = nlev*ncol/vsize+1
+    !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
     do ilev = 1, nlev
       do icol = 1, ncol
         broadband_flux(icol,ilev) = 0._wp
       end do
     end do
 
-    !$acc parallel loop collapse(3)
+    ngangs = nlev*ncol*ngpt/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do ilev = 1, nlev
       do icol = 1, ncol
         do igpt = 1, ngpt
@@ -63,18 +66,21 @@ contains
     integer,                               intent(in ) :: ncol, nlev, ngpt
     real(wp), dimension(ncol, nlev, ngpt), intent(in ) :: spectral_flux_dn, spectral_flux_up
     real(wp), dimension(ncol, nlev),       intent(out) :: broadband_flux_net
-    integer  :: icol, ilev, igpt
+    integer  :: icol, ilev, igpt, ngangs
     real(wp) :: total, tmp
 
     !$acc enter data copyin(spectral_flux_dn, spectral_flux_up) create(broadband_flux_net)
-    !$acc parallel loop collapse(2)
+
+    ngangs = nlev*ncol/vsize+1
+    !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
     do ilev = 1, nlev
       do icol = 1, ncol
         broadband_flux_net(icol,ilev) = 0._wp
       end do
     end do
 
-    !$acc parallel loop collapse(3)
+    ngangs = nlev*ncol*ngpt/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do ilev = 1, nlev
       do icol = 1, ncol
         do igpt = 1, ngpt
@@ -95,15 +101,14 @@ contains
     integer,                         intent(in ) :: ncol, nlay
     real(wp), dimension(ncol, nlay), intent(in ) :: flux_dn, flux_up
     real(wp), dimension(ncol, nlay), intent(out) :: broadband_flux_net
-    integer :: icol, ilay
-    !$acc enter data copyin(flux_dn, flux_up) create(broadband_flux_net)
-    !$acc parallel loop collapse(2)
-    do ilay = 1, nlay
+    integer :: icol, ilay, ngangs
+    ngangs = nlay*ncol/vsize+1
+    !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
+    do ilay = 1, nlay 
       do icol = 1, ncol
          broadband_flux_net(icol,ilay) = flux_dn(icol,ilay) - flux_up(icol,ilay)
        end do
     end do
-    !$acc exit data delete(flux_dn, flux_up) copyout(broadband_flux_net)
   end subroutine net_broadband_precalc
   ! ----------------------------------------------------------------------------
 end module mo_fluxes_broadband_kernels

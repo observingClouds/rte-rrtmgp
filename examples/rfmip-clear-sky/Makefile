@@ -17,8 +17,8 @@ FCINCLUDE += -I$(RRTMGP_DIR)
 NCHOME = $(OLCF_NETCDF_ROOT)
 NFHOME = $(OLCF_NETCDF_FORTRAN_ROOT)
 # Local development environment
-NCHOME = /opt/local
-NFHOME = $(HOME)/Applications/$(FC)
+# NCHOME = /opt/local
+# NFHOME = $(HOME)/Applications/$(FC)
 FCINCLUDE += -I$(NFHOME)/include
 LDFLAGS   += -L$(NFHOME)/lib -L$(NCHOME)/lib
 LIBS      += -lnetcdff -lnetcdf

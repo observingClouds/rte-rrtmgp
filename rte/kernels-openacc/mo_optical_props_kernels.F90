@@ -25,7 +25,7 @@
 
 module mo_optical_props_kernels
   use, intrinsic :: iso_c_binding
-  use mo_rte_kind, only: wp, wl
+  use mo_rte_kind, only: wp, wl, vsize
   implicit none
 
   public
@@ -39,6 +39,9 @@ module mo_optical_props_kernels
   end interface extract_subset
 
   real(wp), parameter, private :: eps = 3.0_wp*tiny(1.0_wp)
+
+  integer :: ngangs
+
 contains
   ! -------------------------------------------------------------------------------------------------
   !
@@ -59,7 +62,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(ssa(:ncol,:nlay,:ngpt),tau(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(f(:ncol,:nlay,:ngpt)) &
     !$acc&     copy(g(:ncol,:nlay,:ngpt))
@@ -90,7 +94,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(tau(:ncol,:nlay,:ngpt),ssa(:ncol,:nlay,:ngpt),g(:ncol,:nlay,:ngpt))
     do igpt = 1, ngpt
       do ilay = 1, nlay
@@ -134,7 +139,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(tau2(:ncol,:nlay,:ngpt)) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt))
     do igpt = 1, ngpt
@@ -158,7 +164,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(tau2(:ncol,:nlay,:ngpt)) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(ssa2(:ncol,:nlay,:ngpt))
@@ -184,7 +191,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(tau2(:ncol,:nlay,:ngpt)) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(ssa2(:ncol,:nlay,:ngpt))
@@ -212,7 +220,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(tau2(:ncol,:nlay,:ngpt)) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt))
@@ -243,7 +252,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(g2(:ncol,:nlay,:ngpt)) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(ssa2(:ncol,:nlay,:ngpt),tau2(:ncol,:nlay,:ngpt)) &
@@ -284,7 +294,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(p2(:1,:ncol,:nlay,:ngpt)) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(ssa2(:ncol,:nlay,:ngpt),tau2(:ncol,:nlay,:ngpt)) &
@@ -324,7 +335,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(tau2(:ncol,:nlay,:ngpt)) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt))
@@ -359,7 +371,8 @@ contains
     ! --------------
     ! --------------
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(p1(:nmom1,:ncol,:nlay,:ngpt),ssa1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(ssa2(:ncol,:nlay,:ngpt)) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
@@ -410,7 +423,8 @@ contains
     ! --------------
     mom_lim = min(nmom1, nmom2)
 
-    !$acc  parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc  parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(p2(:mom_lim,:ncol,:nlay,:ngpt)) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(ssa2(:ncol,:nlay,:ngpt),tau2(:ncol,:nlay,:ngpt)) &
@@ -453,7 +467,8 @@ contains
     integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims ! Starting and ending gpoint for each band
     integer :: ibnd, igpt, icol, ilay
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc& copyin(tau2(:ncol,:nlay,:nbnd)) &
     !$acc& copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc& copyin(gpt_lims(:,:nbnd))
@@ -481,7 +496,8 @@ contains
     integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims ! Starting and ending gpoint for each band
     integer :: ibnd, igpt, icol, ilay
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(tau2(:ncol,:nlay,:nbnd),ssa2(:ncol,:nlay,:nbnd)) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(gpt_lims(:,:nbnd))
@@ -509,7 +525,8 @@ contains
     integer,  dimension(2,nbnd),         intent(in   ) :: gpt_lims ! Starting and ending gpoint for each band
     integer :: ibnd, igpt, icol, ilay
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(gpt_lims(:,:nbnd),tau2(:ncol,:nlay,:nbnd)) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(ssa2(:ncol,:nlay,:nbnd))
@@ -540,7 +557,8 @@ contains
     integer  :: icol, ilay, igpt, ibnd
     real(wp) :: tau12
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(tau2(:ncol,:nlay,:nbnd)) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
@@ -573,7 +591,8 @@ contains
     integer  :: icol, ilay, igpt, ibnd
     real(wp) :: tau12, tauscat12
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(tau2(:ncol,:nlay,:nbnd),ssa2(:ncol,:nlay,:nbnd)) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
@@ -618,7 +637,8 @@ contains
     integer  :: icol, ilay, igpt, ibnd
     real(wp) :: tau12, tauscat12
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(tau2(:ncol,:nlay,:nbnd),ssa2(:ncol,:nlay,:nbnd)) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
@@ -661,7 +681,8 @@ contains
     integer  :: icol, ilay, igpt, ibnd
     real(wp) :: tau12
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(tau2(:ncol,:nlay,:nbnd)) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
@@ -699,7 +720,8 @@ contains
     real(wp), dimension(nmom1) :: temp_moms ! TK
     integer  :: imom  !TK
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(tau1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(ssa2(:ncol,:nlay,:nbnd)) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt),p1(:nmom1,:ncol,:nlay,:ngpt)) &
@@ -752,7 +774,9 @@ contains
     real(wp) :: tau12, tauscat12
 
     mom_lim = min(nmom1, nmom2)
-    !$acc parallel loop collapse(3) &
+
+    ngangs = ngpt*nlay*ncol/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(p2(:mom_lim,:ncol,:nlay,:nbnd)) &
     !$acc&     copy(ssa1(:ncol,:nlay,:ngpt)) &
     !$acc&     copyin(ssa2(:ncol,:nlay,:nbnd)) &
@@ -799,7 +823,8 @@ contains
                              nlay,ngpt), intent(out) :: array_out
     integer :: icol, ilay, igpt
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*(colE-colS+1)/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyout(array_out(:cole-cols+1,:nlay,:ngpt)) &
     !$acc&     copyin(array_in(cols:cole,:nlay,:ngpt))
     do igpt = 1, ngpt
@@ -822,7 +847,8 @@ contains
 
     integer :: icol, ilay, igpt, imom
 
-    !$acc parallel loop collapse(4) &
+    ngangs = ngpt*nlay*(colE-colS+1)*nmom/vsize+1
+    !$acc parallel loop collapse(4) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyout(array_out(:nmom,:cole-cols+1,:nlay,:ngpt)) &
     !$acc&     copyin(array_in(:nmom,cols:cole,:nlay,:ngpt))
     do igpt = 1, ngpt
@@ -851,7 +877,8 @@ contains
 
     integer :: icol, ilay, igpt
 
-    !$acc parallel loop collapse(3) &
+    ngangs = ngpt*nlay*(colE-colS+1)/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyin(ssa_in(cols:cole,:nlay,:ngpt)) &
     !$acc&     copyout(tau_out(:cole-cols+1,:nlay,:ngpt)) &
     !$acc&     copyin(tau_in(cols:cole,:nlay,:ngpt))

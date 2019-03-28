@@ -15,7 +15,7 @@
 !   source functions.
 
 module mo_gas_optics_kernels
-  use mo_rte_kind,      only: wp
+  use mo_rte_kind,      only: wp, vsize
   use mo_util_string,   only : string_loc_in_array
   implicit none
 
@@ -94,7 +94,7 @@ contains
     !
     logical                    :: top_at_1
     integer, dimension(ncol,2) :: itropo_lower, itropo_upper
-    integer                    :: icol, idx_tropo
+    integer                    :: icol, idx_tropo, ngangs
 
     ! ----------------------------------------------------------------
 
@@ -109,7 +109,8 @@ contains
     ! ---------------------
     top_at_1 = play(1,1) < play(1, nlay)
     if(top_at_1) then
-      !$acc parallel loop
+      ngangs = ncol/vsize+1
+      !$acc parallel loop num_gangs(ngangs) vector_length(vsize)
       do icol = 1,ncol
         itropo_lower(icol,2) = nlay
         itropo_lower(icol,1) = minloc(play(icol,:), dim=1, mask=tropo(icol,:))
@@ -117,7 +118,8 @@ contains
         itropo_upper(icol,2) = maxloc(play(icol,:), dim=1, mask=(.not. tropo(icol,:)))
       end do
     else
-      !$acc parallel loop
+      ngangs = ncol/vsize+1
+      !$acc parallel loop num_gangs(ngangs) vector_length(vsize)
       do icol = 1,ncol
         itropo_lower(icol,1) = 1
         itropo_lower(icol,2) = minloc(play(icol,:), dim=1, mask= tropo(icol,:))
@@ -214,14 +216,15 @@ contains
     ! local variables
     real(wp) :: tau_major ! major species optical depth
     ! local index
-    integer :: icol, ilay, iflav, igpt, itropo
+    integer :: icol, ilay, iflav, igpt, itropo, ngangs
 
     ! -----------------
 
     ! -----------------
 
     ! optical depth calculation for major species
-    !$acc parallel loop collapse(3)
+    ngangs = nlay*ncol*ngpt/vsize+1
+    !$acc parallel loop collapse(3) gang vector num_gangs(ngangs) vector_length(vsize)
     do ilay = 1, nlay
       do icol = 1, ncol
         ! optical depth calculation for major species
@@ -283,12 +286,13 @@ contains
     real(wp) :: scaling, kminor_loc, tau_minor ! minor species absorption coefficient, optical depth
     integer  :: icol, ilay, iflav, igpt, imnr
     integer  :: itl, itu, iml, imu
-    integer  :: minor_start, minor_loc, extent
+    integer  :: minor_start, minor_loc, extent, ngangs
     ! -----------------
 
     extent = size(scale_by_complement,dim=1)
 
-    !$acc parallel loop collapse(3) private(vmr)
+    ngangs = extent*ncol*nlay/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) private(vmr)
     do imnr = 1, extent  ! loop over minor absorbers in each band
       do icol = 1, ncol
         do ilay = 1 , nlay
@@ -368,10 +372,11 @@ contains
     ! local variables
     real(wp) :: k ! rayleigh scattering coefficient
     integer  :: icol, ilay, iflav, igpt
-    integer  :: itropo
+    integer  :: itropo, ngangs
     ! -----------------
 
-    !$acc parallel loop collapse(3)
+    ngangs = nlay*ncol*ngpt/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do ilay = 1, nlay
       do icol = 1, ncol
         do igpt = 1, ngpt
@@ -414,7 +419,7 @@ contains
     real(wp), dimension(ncol,nlay,ngpt), intent(out) :: lev_src_inc, lev_src_dec
     ! -----------------
     ! local
-    integer  :: ilay, icol, igpt, itropo, iflav
+    integer  :: ilay, icol, igpt, itropo, iflav, ngangs
     real(wp) :: pfrac          (ngpt,nlay,  ncol)
     real(wp) :: planck_function(nbnd,nlay+1,ncol)
     real(wp) :: scaling_array(2)
@@ -427,7 +432,8 @@ contains
     !$acc enter data create(pfrac,planck_function)
 
     ! Calculation of fraction of band's Planck irradiance associated with each g-point
-    !$acc parallel loop collapse(3)
+    ngangs = ncol*nlay*ngpt/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do icol = 1, ncol
       do ilay = 1, nlay
         do igpt = 1, ngpt
@@ -446,21 +452,24 @@ contains
     ! Planck function by band for the surface
     ! Compute surface source irradiance for g-point, equals band irradiance x fraction for g-point
     !
-    !$acc parallel loop
+    ngangs = ncol/vsize+1
+    !$acc parallel loop num_gangs(ngangs) vector_length(vsize)
     do icol = 1, ncol
       call interpolate1D(tsfc(icol), temp_ref_min, totplnk_delta, totplnk, planck_function(1:nbnd,1,icol))
     end do
     !
     ! Map to g-points
     !
-    !$acc parallel loop collapse(2)
+    ngangs = ncol*ngpt/vsize+1
+    !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
     do icol = 1, ncol
       do igpt = 1, ngpt
         sfc_src(icol,igpt) = pfrac(igpt,sfc_lay,icol) * planck_function(gpoint_bands(igpt), 1, icol)
       end do
     end do ! icol
 
-    !$acc parallel loop collapse(2)
+    ngangs = ncol*nlay/vsize+1
+    !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
     do icol = 1, ncol
       do ilay = 1, nlay
         ! Compute layer source irradiance for g-point, equals band irradiance x fraction for g-point
@@ -470,7 +479,8 @@ contains
     !
     ! Map to g-points
     !
-    !$acc parallel loop collapse(3)
+    ngangs = ncol*nlay*ngpt/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do icol = 1, ncol
       do ilay = 1, nlay
         do igpt = 1, ngpt
@@ -480,12 +490,14 @@ contains
     end do ! icol
 
     ! compute level source irradiances for each g-point, one each for upward and downward paths
-    !$acc parallel loop
+    ngangs = ncol/vsize+1
+    !$acc parallel loop num_gangs(ngangs) vector_length(vsize)
     do icol = 1, ncol
       call interpolate1D(tlev(icol,     1), temp_ref_min, totplnk_delta, totplnk, planck_function(1:nbnd,       1,icol))
     end do
 
-    !$acc parallel loop collapse(2)
+    ngangs = ncol*nlay/vsize+1
+    !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
     do icol = 1, ncol
       do ilay = 2, nlay+1
         call interpolate1D(tlev(icol,ilay), temp_ref_min, totplnk_delta, totplnk, planck_function(1:nbnd,ilay,icol))
@@ -495,7 +507,8 @@ contains
     !
     ! Map to g-points
     !
-    !$acc parallel loop collapse(3)
+    ngangs = ncol*nlay*ngpt/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do icol = 1, ncol
       do ilay = 1, nlay
         do igpt = 1, ngpt
@@ -627,13 +640,14 @@ contains
     real(wp) :: ftemp_term
     ! -----------------
     ! local indexes
-    integer :: icol, ilay, iflav, igases(2), itropo, itemp
+    integer :: icol, ilay, iflav, igases(2), itropo, itemp, ngangs
 
     !$acc enter data copyin(flavor,press_ref_log,temp_ref,vmr_ref,play,tlay,col_gas)
     !$acc enter data create(jtemp,jpress,tropo,jeta,col_mix,fmajor,fminor)
     !$acc enter data create(ftemp,fpress)
 
-    !$acc parallel loop collapse(2)
+    ngangs = nlay*ncol/vsize+1
+    !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize)
     do ilay = 1, nlay
       do icol = 1, ncol
         ! index and factor for temperature interpolation
@@ -654,7 +668,8 @@ contains
     ! loop over implemented combinations of major species
     ! PGI BUG WORKAROUND: if present(vmr_ref) isn't there, OpenACC runtime
     ! thinks it isn't present.
-    !$acc parallel loop collapse(4) private(igases) present(vmr_ref)
+    ngangs = nlay*ncol*nflav*2/vsize+1
+    !$acc parallel loop collapse(4) num_gangs(ngangs) vector_length(vsize) private(igases) present(vmr_ref)
     do ilay = 1, nlay
       do icol = 1, ncol
         ! loop over implemented combinations of major species
@@ -704,10 +719,11 @@ contains
     real(wp), dimension(ngpt,nlay,ncol), intent(in   ) :: tau_abs, tau_rayleigh
     real(wp), dimension(ncol,nlay,ngpt), intent(inout) :: tau, ssa, g ! inout because components are allocated
     ! -----------------------
-    integer  :: icol, ilay, igpt
+    integer  :: icol, ilay, igpt, ngangs
     real(wp) :: t
     ! -----------------------
-    !$acc parallel loop collapse(3) &
+    ngangs = ncol*nlay*ngpt/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(tau, ssa, g) &
     !$acc&     copyin(tau_rayleigh,tau_abs)
     do icol = 1, ncol
@@ -738,10 +754,11 @@ contains
     real(wp), dimension(nmom,ncol,nlay,ngpt), &
                                          intent(inout) :: p
     ! -----------------------
-    integer :: icol, ilay, igpt, imom
+    integer :: icol, ilay, igpt, imom, ngangs
     real(wp) :: t
     ! -----------------------
-    !$acc parallel loop collapse(3) &
+    ngangs = ncol*nlay*ngpt/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copy(tau, ssa, p) &
     !$acc&     copyin(tau_rayleigh(:ngpt,:nlay,:ncol),tau_abs(:ngpt,:nlay,:ncol))
     do icol = 1, ncol
@@ -768,9 +785,10 @@ contains
     integer, intent(in) :: ni, nj, nk
     real(wp), dimension(ni, nj, nk), intent(out) :: array
     ! -----------------------
-    integer :: i,j,k
+    integer :: i,j,k,ngangs
     ! -----------------------
-    !$acc parallel loop collapse(3) &
+    ngangs = nk*nj*ni/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyout(array(:ni,:nj,:nk))
     do k = 1, nk
       do j = 1, nj
@@ -786,9 +804,10 @@ contains
     integer, intent(in) :: ni, nj, nk, nl
     real(wp), dimension(ni, nj, nk, nl), intent(out) :: array
     ! -----------------------
-    integer :: i,j,k,l
+    integer :: i,j,k,l,ngangs
     ! -----------------------
-    !$acc parallel loop collapse(4) &
+    ngangs = nl*nk*nj*ni/vsize+1
+    !$acc parallel loop collapse(4) num_gangs(ngangs) vector_length(vsize) &
     !$acc&     copyout(array(:ni,:nj,:nk,:nl))
     do l = 1, nl
       do k = 1, nk

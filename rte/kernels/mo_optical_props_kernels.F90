@@ -20,7 +20,7 @@
 
 module mo_optical_props_kernels
   use, intrinsic :: iso_c_binding
-  use mo_rte_kind, only: wp, wl
+  use mo_rte_kind, only: wp, wl, vsize
   implicit none
 
   public
@@ -633,9 +633,10 @@ contains
     real(wp), dimension(colE-colS+1,&
                              nlay,ngpt), intent(out) :: array_out
 
-    integer :: icol, ilay, igpt
-    !$acc enter data copyin(array_in) create(array_out)
-    !$acc parallel collapse(3)
+    integer :: icol, ilay, igpt, ngangs
+
+    ngangs = ngpt*nlay*(colE-colS+1)/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do igpt = 1, ngpt
       do ilay = 1, nlay
         do icol = colS, colE
@@ -643,7 +644,6 @@ contains
         end do
       end do
     end do
-    !$acc exit data delete(array_in) copyout(array_out)
 
   end subroutine extract_subset_dim1_3d
   ! ---------------------------------
@@ -655,10 +655,10 @@ contains
     real(wp), dimension(nmom,colE-colS+1,&
                                   nlay,ngpt), intent(out) :: array_out
 
-    integer :: icol, ilay, igpt, imom
+    integer :: icol, ilay, igpt, imom, ngangs
 
-    !$acc enter data copyin(array_in) create(array_out)
-    !$acc parallel collapse(4)
+    ngangs = ngpt*nlay*(colE-colS+1)*nmom/vsize+1
+    !$acc parallel loop collapse(4) num_gangs(ngangs) vector_length(vsize)
     do igpt = 1, ngpt
       do ilay = 1, nlay
         do icol = colS, colE
@@ -668,7 +668,6 @@ contains
         end do
       end do
     end do
-    !$acc exit data delete(array_in) copyout(array_out)
 
   end subroutine extract_subset_dim2_4d
   ! ---------------------------------
@@ -684,10 +683,10 @@ contains
     real(wp), dimension(colE-colS+1,&
                              nlay,ngpt), intent(out) :: tau_out
 
-    integer :: icol, ilay, igpt
+    integer :: icol, ilay, igpt, ngangs
 
-    !$acc enter data copyin(tau_in, ssa_in) create(tau_out)
-    !$acc parallel collapse(4)
+    ngangs = ngpt*nlay*(colE-colS+1)/vsize+1
+    !$acc parallel loop collapse(3) num_gangs(ngangs) vector_length(vsize)
     do igpt = 1, ngpt
       do ilay = 1, nlay
         do icol = colS, colE
@@ -696,7 +695,6 @@ contains
         end do
       end do
     end do
-    !$acc exit data delete(tau_in, ssa_in) copyout(tau_out)
 
   end subroutine extract_subset_absorption_tau
   ! -------------------------------------------------------------------------------------------------

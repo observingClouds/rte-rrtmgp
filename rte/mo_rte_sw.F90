@@ -28,7 +28,7 @@
 !
 ! -------------------------------------------------------------------------------------------------
 module mo_rte_sw
-  use mo_rte_kind,      only: wp, wl
+  use mo_rte_kind,      only: wp, wl, vsize
   use mo_optical_props, only: ty_optical_props, &
                               ty_optical_props_arry, ty_optical_props_1scl, ty_optical_props_2str, ty_optical_props_nstr
   use mo_fluxes,        only: ty_fluxes
@@ -206,7 +206,7 @@ contains
     real(wp), dimension(:,:), intent(in ) :: arr_in  ! (nband, ncol)
     real(wp), dimension(:,:), intent(out) :: arr_out ! (ncol, igpt)
     ! -------------
-    integer :: ncol, nband, ngpt
+    integer :: ncol, nband, ngpt, ngangs
     integer :: icol, iband, igpt
     integer, dimension(2,ops%get_nband()) :: limits
 
@@ -214,7 +214,9 @@ contains
     nband = ops%get_nband()
     ngpt  = ops%get_ngpt()
     limits = ops%get_band_lims_gpoint()
-    !$acc parallel loop collapse(2) copyin(arr_in, limits)
+
+    ngangs = nband*ncol/vsize+1
+    !$acc parallel loop collapse(2) num_gangs(ngangs) vector_length(vsize) copyin(arr_in, limits)
     do iband = 1, nband
       do icol = 1, ncol
         do igpt = limits(1, iband), limits(2, iband)
